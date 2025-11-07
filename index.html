@@ -9,18 +9,16 @@
     font-family: "Noto Sans JP", sans-serif;
     background-color: #f9f9f9;
     margin: 0;
-    padding: 0.8em;
+    padding: 1em;
   }
-
   h1 {
     font-size: 1.4em;
     margin-bottom: 1em;
     border-left: 6px solid #1f8b4c;
     padding-left: 0.5em;
   }
-
   form {
-    background-color: #fff;
+    background: #fff;
     border-radius: 8px;
     padding: 1em;
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
@@ -30,18 +28,14 @@
     max-width: 600px;
     margin: 0 auto;
   }
-
   label { font-weight: bold; margin-bottom: 0.2em; }
-
   input, select {
     width: 100%;
     padding: 0.7em;
-    font-size: 1em;
-    border-radius: 6px;
     border: 1px solid #ccc;
+    border-radius: 6px;
     box-sizing: border-box;
   }
-
   button {
     background-color: #1f8b4c;
     color: white;
@@ -51,37 +45,31 @@
     font-size: 1.1em;
     cursor: pointer;
   }
-
   button:hover { background-color: #176b3a; }
 
   .table-container {
     margin-top: 1.2em;
     overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
   }
-
   table {
     width: 100%;
     border-collapse: collapse;
     background-color: #fff;
     min-width: 700px;
   }
-
   th, td {
     border: 1px solid #ddd;
-    text-align: center;
     padding: 0.6em;
-    white-space: nowrap;
+    text-align: center;
   }
-
   th { background-color: #f3f3f3; }
 
-  /* ====== 色分け ====== */
+  /* 色分け */
   .status-gray { background-color: #e0e0e0; color: #555; }
   .status-green { background-color: #d4edda; font-weight: bold; color: #155724; }
   .status-inquiry { background-color: #fff3cd; }
 
-  /* ====== ページネーション ====== */
+  /* ページネーション */
   .pagination {
     display: flex;
     justify-content: center;
@@ -101,7 +89,7 @@
     cursor: default;
   }
 
-  /* ====== スピナー ====== */
+  /* スピナー */
   #spinner {
     display: none;
     text-align: center;
@@ -118,14 +106,11 @@
   }
   @keyframes spin { 100% { transform: rotate(360deg); } }
 
-  /* ====== スマホ最適化 ====== */
   @media (max-width: 768px) {
     th, td { font-size: 0.9em; padding: 0.4em; }
-    form { padding: 0.8em; border: 1px solid #ddd; }
   }
 </style>
 </head>
-
 <body>
   <h1>問い合わせ状況検索</h1>
 
@@ -173,15 +158,18 @@
   </div>
 
 <script>
-let currentPage = 1;
-let rowsPerPage = 5;
 let allData = [];
+let currentPage = 1;
+const rowsPerPage = 5;
 
-document.addEventListener("DOMContentLoaded", () => {
-  google.script.run.withSuccessHandler(renderMonthOptions).getMonthList();
-});
+// JSONファイルのURL（自動更新済みGitHub Pages上）
+const JSON_URL = "https://ko-umeda-coder.github.io/check-bc-np/daigaihana_data.json";
+const MONTHS_URL = "https://ko-umeda-coder.github.io/check-bc-np/months.json";
 
-function renderMonthOptions(months) {
+// 初期化
+document.addEventListener("DOMContentLoaded", async () => {
+  const res = await fetch(MONTHS_URL);
+  const months = await res.json();
   const select = document.getElementById("targetMonth");
   select.innerHTML = '<option value="">選択してください</option>';
   months.forEach(m => {
@@ -190,53 +178,44 @@ function renderMonthOptions(months) {
     opt.textContent = m;
     select.appendChild(opt);
   });
-}
-
-document.getElementById("searchForm").addEventListener("submit", (e) => {
-  e.preventDefault();
-  const params = {
-    month: document.getElementById("targetMonth").value,
-    orderNo: document.getElementById("orderNo").value,
-    weddingDate: document.getElementById("weddingDate").value,
-    groom: document.getElementById("groomName").value,
-    bride: document.getElementById("brideName").value,
-  };
-  if (!params.month) {
-    alert("対象年月を選択してください。");
-    return;
-  }
-  document.getElementById("spinner").style.display = "block";
-  google.script.run.withSuccessHandler(renderResults).searchData(params);
 });
 
-function renderResults(data) {
+// 検索ボタン
+document.getElementById("searchForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const month = document.getElementById("targetMonth").value;
+  if (!month) return alert("対象年月を選択してください。");
+  document.getElementById("spinner").style.display = "block";
+
+  const res = await fetch(JSON_URL);
+  const data = await res.json();
+  allData = data.filter(r => r["対象年月"] === month);
   document.getElementById("spinner").style.display = "none";
-  allData = data;
+
   currentPage = 1;
   renderPage();
-}
+});
 
 function renderPage() {
   const tbody = document.querySelector("#resultTable tbody");
   tbody.innerHTML = "";
-
   const start = (currentPage - 1) * rowsPerPage;
   const end = Math.min(start + rowsPerPage, allData.length);
   const pageData = allData.slice(start, end);
 
-  pageData.forEach(row => {
+  pageData.forEach(r => {
     const tr = document.createElement("tr");
-    if (row.backColor === "対象外") tr.classList.add("status-gray");
-    else if (row.backColor === "問い合わせ中") tr.classList.add("status-inquiry");
-    else if (row.backColor && row.backColor !== "問い合わせ中") tr.classList.add("status-green");
+    if (r["BK"] === "対象外") tr.classList.add("status-gray");
+    else if (r["BK"] === "問い合わせ中") tr.classList.add("status-inquiry");
+    else tr.classList.add("status-green");
 
     tr.innerHTML = `
-      <td>${row.orderNo}</td>
-      <td>${row.date}</td>
-      <td>${row.groom}</td>
-      <td>${row.bride}</td>
-      <td>${row.backColor}</td>
-      <td>${row.namePlate}</td>
+      <td>${r["受注番号"]}</td>
+      <td>${r["挙式日"]}</td>
+      <td>${r["新郎"]}</td>
+      <td>${r["新婦"]}</td>
+      <td>${r["BK"]}</td>
+      <td>${r["ネームプレート"]}</td>
     `;
     tbody.appendChild(tr);
   });
@@ -251,17 +230,11 @@ function renderPage() {
 }
 
 document.getElementById("prevBtn").addEventListener("click", () => {
-  if (currentPage > 1) {
-    currentPage--;
-    renderPage();
-  }
+  if (currentPage > 1) { currentPage--; renderPage(); }
 });
 document.getElementById("nextBtn").addEventListener("click", () => {
   const totalPages = Math.ceil(allData.length / rowsPerPage);
-  if (currentPage < totalPages) {
-    currentPage++;
-    renderPage();
-  }
+  if (currentPage < totalPages) { currentPage++; renderPage(); }
 });
 </script>
 </body>
