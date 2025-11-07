@@ -39,7 +39,7 @@
     padding: 4px 8px;
     border: 1px solid #ccc;
     border-radius: 4px;
-    background-color: #fff; /* ← 背景色を白に固定 */
+    background-color: #fff; /* 背景を白固定 */
   }
 
   input[type="text"]::placeholder {
@@ -105,6 +105,7 @@
 
 <body>
 <h1>問い合わせ状況検索</h1>
+
 <div class="search-form">
   <label>対象年月（必須）：</label>
   <select id="targetMonth"></select><br>
@@ -155,12 +156,14 @@ async function searchData() {
 
   const response = await fetch("https://raw.githubusercontent.com/ko-umeda-coder/check-bc-np/main/daigaihana_data.json");
   const json = await response.json();
+
+  // フィルタリング
   allData = json.filter(d =>
     (!month || d["対象年月"] === month) &&
-    (!orderNo || d["受注番号"].includes(orderNo)) &&
-    (!groom || d["新郎"].includes(groom)) &&
-    (!bride || d["新婦"].includes(bride)) &&
-    (!date || d["挙式日"].includes(date))
+    (!orderNo || (d["受注番号"] || "").includes(orderNo)) &&
+    (!groom || (d["新郎"] || "").includes(groom)) &&
+    (!bride || (d["新婦"] || "").includes(bride)) &&
+    (!date || (d["挙式日"] || "").includes(date))
   );
   currentPage = 1;
   displayData();
@@ -176,14 +179,27 @@ function displayData() {
   const pageData = allData.slice(start, end);
 
   for (const item of pageData) {
+    // JSONキー対応（旧キー互換）
+    const backColor = item["バックカラー"] || item["BK"] || "";
+    const namePlate = item["ネームプレート"] || item["NP"] || "";
+
     const tr = document.createElement("tr");
+
+    // 背景色・太字条件
+    if (backColor === "対象外" || namePlate === "対象外") {
+      tr.style.backgroundColor = "#eee"; // グレーアウト
+    } else if (backColor !== "問い合わせ中" && backColor !== "") {
+      tr.style.backgroundColor = "#e9fbe9"; // 薄い緑
+      tr.style.fontWeight = "bold"; // 太字
+    }
+
     tr.innerHTML = `
-      <td>${item["受注番号"]}</td>
-      <td>${item["挙式日"]}</td>
-      <td>${item["新郎"]}</td>
-      <td>${item["新婦"]}</td>
-      <td>${item["バックカラー"]}</td>
-      <td>${item["ネームプレート"]}</td>
+      <td>${item["受注番号"] || ""}</td>
+      <td>${item["挙式日"] || ""}</td>
+      <td>${item["新郎"] || ""}</td>
+      <td>${item["新婦"] || ""}</td>
+      <td>${backColor}</td>
+      <td>${namePlate}</td>
     `;
     tbody.appendChild(tr);
   }
@@ -191,7 +207,7 @@ function displayData() {
   renderPagination();
 }
 
-/* ページボタン */
+/* ページボタン描画 */
 function renderPagination() {
   const totalPages = Math.ceil(allData.length / rowsPerPage);
   const container = document.getElementById("pagination");
@@ -209,10 +225,10 @@ function renderPagination() {
   }
 }
 
-/* 対象月リスト生成 */
+/* 対象月リスト自動生成 */
 (function(){
   const select = document.getElementById("targetMonth");
-  const months = ["2025年3月","2025年4月","2025年5月","2025年6月","2025年7月","2025年8月","2025年9月"];
+  const months = ["2025年3月","2025年4月","2025年5月","2025年6月","2025年7月","2025年8月","2025年9月","2025年10月","2025年11月"];
   for (const m of months) {
     const opt = document.createElement("option");
     opt.value = m;
