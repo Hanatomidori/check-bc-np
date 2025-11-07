@@ -5,7 +5,124 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>問い合わせ状況検索</title>
 <style>
-/* ← ここは前回のスマホ対応スタイルをそのまま利用（省略可） */
+  body {
+    font-family: "Noto Sans JP", sans-serif;
+    background-color: #f9f9f9;
+    margin: 0;
+    padding: 0.8em;
+  }
+
+  h1 {
+    font-size: 1.4em;
+    margin-bottom: 1em;
+    border-left: 6px solid #1f8b4c;
+    padding-left: 0.5em;
+  }
+
+  form {
+    background-color: #fff;
+    border-radius: 8px;
+    padding: 1em;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+    gap: 0.8em;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+
+  label { font-weight: bold; margin-bottom: 0.2em; }
+
+  input, select {
+    width: 100%;
+    padding: 0.7em;
+    font-size: 1em;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    box-sizing: border-box;
+  }
+
+  button {
+    background-color: #1f8b4c;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 0.9em;
+    font-size: 1.1em;
+    cursor: pointer;
+  }
+
+  button:hover { background-color: #176b3a; }
+
+  .table-container {
+    margin-top: 1.2em;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: #fff;
+    min-width: 700px;
+  }
+
+  th, td {
+    border: 1px solid #ddd;
+    text-align: center;
+    padding: 0.6em;
+    white-space: nowrap;
+  }
+
+  th { background-color: #f3f3f3; }
+
+  /* ====== 色分け ====== */
+  .status-gray { background-color: #e0e0e0; color: #555; }
+  .status-green { background-color: #d4edda; font-weight: bold; color: #155724; }
+  .status-inquiry { background-color: #fff3cd; }
+
+  /* ====== ページネーション ====== */
+  .pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1em;
+    margin-top: 1em;
+  }
+  .pagination button {
+    padding: 0.4em 1em;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    background: #fff;
+    cursor: pointer;
+  }
+  .pagination button:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  /* ====== スピナー ====== */
+  #spinner {
+    display: none;
+    text-align: center;
+    margin-top: 1.5em;
+  }
+  .loader {
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #1f8b4c;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto;
+  }
+  @keyframes spin { 100% { transform: rotate(360deg); } }
+
+  /* ====== スマホ最適化 ====== */
+  @media (max-width: 768px) {
+    th, td { font-size: 0.9em; padding: 0.4em; }
+    form { padding: 0.8em; border: 1px solid #ddd; }
+  }
 </style>
 </head>
 
@@ -31,6 +148,8 @@
     <button type="submit">検索</button>
   </form>
 
+  <div id="spinner"><div class="loader"></div><p>検索中です...</p></div>
+
   <div class="table-container">
     <table id="resultTable">
       <thead>
@@ -47,7 +166,17 @@
     </table>
   </div>
 
+  <div class="pagination" id="pagination" style="display:none;">
+    <button id="prevBtn">前へ</button>
+    <span id="pageInfo"></span>
+    <button id="nextBtn">次へ</button>
+  </div>
+
 <script>
+let currentPage = 1;
+let rowsPerPage = 5;
+let allData = [];
+
 document.addEventListener("DOMContentLoaded", () => {
   google.script.run.withSuccessHandler(renderMonthOptions).getMonthList();
 });
@@ -72,16 +201,31 @@ document.getElementById("searchForm").addEventListener("submit", (e) => {
     groom: document.getElementById("groomName").value,
     bride: document.getElementById("brideName").value,
   };
+  if (!params.month) {
+    alert("対象年月を選択してください。");
+    return;
+  }
+  document.getElementById("spinner").style.display = "block";
   google.script.run.withSuccessHandler(renderResults).searchData(params);
 });
 
 function renderResults(data) {
+  document.getElementById("spinner").style.display = "none";
+  allData = data;
+  currentPage = 1;
+  renderPage();
+}
+
+function renderPage() {
   const tbody = document.querySelector("#resultTable tbody");
   tbody.innerHTML = "";
-  data.forEach(row => {
-    const tr = document.createElement("tr");
 
-    // 色判定
+  const start = (currentPage - 1) * rowsPerPage;
+  const end = Math.min(start + rowsPerPage, allData.length);
+  const pageData = allData.slice(start, end);
+
+  pageData.forEach(row => {
+    const tr = document.createElement("tr");
     if (row.backColor === "対象外") tr.classList.add("status-gray");
     else if (row.backColor === "問い合わせ中") tr.classList.add("status-inquiry");
     else if (row.backColor && row.backColor !== "問い合わせ中") tr.classList.add("status-green");
@@ -96,7 +240,29 @@ function renderResults(data) {
     `;
     tbody.appendChild(tr);
   });
+
+  const totalPages = Math.ceil(allData.length / rowsPerPage);
+  const pagination = document.getElementById("pagination");
+  const pageInfo = document.getElementById("pageInfo");
+  pagination.style.display = totalPages > 1 ? "flex" : "none";
+  pageInfo.textContent = `${currentPage} / ${totalPages}`;
+  document.getElementById("prevBtn").disabled = currentPage === 1;
+  document.getElementById("nextBtn").disabled = currentPage === totalPages;
 }
+
+document.getElementById("prevBtn").addEventListener("click", () => {
+  if (currentPage > 1) {
+    currentPage--;
+    renderPage();
+  }
+});
+document.getElementById("nextBtn").addEventListener("click", () => {
+  const totalPages = Math.ceil(allData.length / rowsPerPage);
+  if (currentPage < totalPages) {
+    currentPage++;
+    renderPage();
+  }
+});
 </script>
 </body>
 </html>
