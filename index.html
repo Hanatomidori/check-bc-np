@@ -5,110 +5,27 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>問い合わせ状況検索</title>
 <style>
-  body {
-    font-family: "Noto Sans JP", sans-serif;
-    background-color: #f9f9f9;
-    margin: 0;
-    padding: 1em;
-  }
-  h1 {
-    font-size: 1.4em;
-    margin-bottom: 1em;
-    border-left: 6px solid #1f8b4c;
-    padding-left: 0.5em;
-  }
-  form {
-    background: #fff;
-    border-radius: 8px;
-    padding: 1em;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    display: flex;
-    flex-direction: column;
-    gap: 0.8em;
-    max-width: 600px;
-    margin: 0 auto;
-  }
+  body { font-family: "Noto Sans JP", sans-serif; background-color: #f9f9f9; margin: 0; padding: 1em; }
+  h1 { font-size: 1.4em; margin-bottom: 1em; border-left: 6px solid #1f8b4c; padding-left: 0.5em; }
+  form { background: #fff; border-radius: 8px; padding: 1em; box-shadow: 0 2px 5px rgba(0,0,0,0.1); display: flex; flex-direction: column; gap: 0.8em; max-width: 600px; margin: 0 auto; }
   label { font-weight: bold; margin-bottom: 0.2em; }
-  input, select {
-    width: 100%;
-    padding: 0.7em;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    box-sizing: border-box;
-  }
-  button {
-    background-color: #1f8b4c;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    padding: 0.9em;
-    font-size: 1.1em;
-    cursor: pointer;
-  }
+  input, select { width: 100%; padding: 0.7em; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+  button { background-color: #1f8b4c; color: white; border: none; border-radius: 6px; padding: 0.9em; font-size: 1.1em; cursor: pointer; }
   button:hover { background-color: #176b3a; }
-
-  .table-container {
-    margin-top: 1.2em;
-    overflow-x: auto;
-  }
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    background-color: #fff;
-    min-width: 700px;
-  }
-  th, td {
-    border: 1px solid #ddd;
-    padding: 0.6em;
-    text-align: center;
-  }
+  .table-container { margin-top: 1.2em; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; background-color: #fff; min-width: 700px; }
+  th, td { border: 1px solid #ddd; padding: 0.6em; text-align: center; }
   th { background-color: #f3f3f3; }
-
-  /* セルごとの色分け */
   .cell-gray { background-color: #e0e0e0; color: #555; }
   .cell-green { background-color: #d4edda; font-weight: bold; color: #155724; }
   .cell-yellow { background-color: #fff3cd; }
-
-  /* ページネーション */
-  .pagination {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 1em;
-    margin-top: 1em;
-  }
-  .pagination button {
-    padding: 0.4em 1em;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-    background: #fff;
-    cursor: pointer;
-  }
-  .pagination button:disabled {
-    opacity: 0.5;
-    cursor: default;
-  }
-
-  /* スピナー */
-  #spinner {
-    display: none;
-    text-align: center;
-    margin-top: 1.5em;
-  }
-  .loader {
-    border: 4px solid #f3f3f3;
-    border-top: 4px solid #1f8b4c;
-    border-radius: 50%;
-    width: 32px;
-    height: 32px;
-    animation: spin 1s linear infinite;
-    margin: 0 auto;
-  }
+  .pagination { display: flex; justify-content: center; align-items: center; gap: 1em; margin-top: 1em; }
+  .pagination button { padding: 0.4em 1em; border: 1px solid #ccc; border-radius: 5px; background: #fff; cursor: pointer; }
+  .pagination button:disabled { opacity: 0.5; cursor: default; }
+  #spinner { display: none; text-align: center; margin-top: 1.5em; }
+  .loader { border: 4px solid #f3f3f3; border-top: 4px solid #1f8b4c; border-radius: 50%; width: 32px; height: 32px; animation: spin 1s linear infinite; margin: 0 auto; }
   @keyframes spin { 100% { transform: rotate(360deg); } }
-
-  @media (max-width: 768px) {
-    th, td { font-size: 0.9em; padding: 0.4em; }
-  }
+  @media (max-width: 768px) { th, td { font-size: 0.9em; padding: 0.4em; } }
 </style>
 </head>
 <body>
@@ -158,9 +75,7 @@
   </div>
 
 <script>
-const JSON_URL = "https://ko-umeda-coder.github.io/check-bc-np/daigaihana_data.json";
 const MONTHS_URL = "https://ko-umeda-coder.github.io/check-bc-np/months.json";
-
 let allData = [];
 let currentPage = 1;
 const rowsPerPage = 5;
@@ -184,12 +99,24 @@ document.getElementById("searchForm").addEventListener("submit", async e => {
   e.preventDefault();
   const month = document.getElementById("targetMonth").value;
   if (!month) return alert("対象年月を選択してください。");
+
+  // 月別JSONのURLを生成（yyyy-m.json形式）
+  const fileName = month.replace("年","-").replace("月","") + ".json";
+  const JSON_URL = `https://ko-umeda-coder.github.io/check-bc-np/${fileName}`;
+
   document.getElementById("spinner").style.display = "block";
 
-  const res = await fetch(JSON_URL);
-  const data = await res.json();
-  allData = data.filter(r => r["対象年月"] === month);
-  document.getElementById("spinner").style.display = "none";
+  try {
+    const res = await fetch(JSON_URL);
+    if (!res.ok) throw new Error("JSON取得失敗");
+    const data = await res.json();
+    allData = data;
+  } catch(err) {
+    alert("データ取得に失敗しました: " + err);
+    allData = [];
+  } finally {
+    document.getElementById("spinner").style.display = "none";
+  }
 
   currentPage = 1;
   renderPage();
@@ -200,24 +127,35 @@ function renderPage() {
   const tbody = document.querySelector("#resultTable tbody");
   tbody.innerHTML = "";
 
+  // 検索条件フィルタ
+  const orderNoVal = document.getElementById("orderNo").value.trim();
+  const weddingDateVal = document.getElementById("weddingDate").value.trim();
+  const groomNameVal = document.getElementById("groomName").value.trim();
+  const brideNameVal = document.getElementById("brideName").value.trim();
+
+  let filtered = allData.filter(r => {
+    return (!orderNoVal || r["受注番号"].includes(orderNoVal)) &&
+           (!weddingDateVal || r["挙式日"].includes(weddingDateVal)) &&
+           (!groomNameVal || r["新郎"].includes(groomNameVal)) &&
+           (!brideNameVal || r["新婦"].includes(brideNameVal));
+  });
+
   const start = (currentPage - 1) * rowsPerPage;
-  const end = Math.min(start + rowsPerPage, allData.length);
-  const pageData = allData.slice(start, end);
+  const end = Math.min(start + rowsPerPage, filtered.length);
+  const pageData = filtered.slice(start, end);
 
   pageData.forEach(r => {
     const tr = document.createElement("tr");
 
-    // セル単位で色付け
     const bkClass = r["BK"] === "対象外"
       ? "cell-gray"
-      : r["BK"] === "問い合わせ中"
+      : r["BK"].includes("問い合わせ中")
         ? "cell-yellow"
         : "cell-green";
 
-    const npClass =
-      r["ネームプレート"].includes("対象外") ? "cell-gray" :
-      r["ネームプレート"].includes("問い合わせ中") ? "cell-yellow" :
-      r["ネームプレート"].includes("手配") ? "cell-green" : "";
+    const npClass = r["ネームプレート"].includes("対象外") ? "cell-gray" :
+                    r["ネームプレート"].includes("問い合わせ中") ? "cell-yellow" :
+                    r["ネームプレート"].includes("手配") ? "cell-green" : "";
 
     tr.innerHTML = `
       <td>${r["受注番号"]}</td>
@@ -230,7 +168,7 @@ function renderPage() {
     tbody.appendChild(tr);
   });
 
-  const totalPages = Math.ceil(allData.length / rowsPerPage);
+  const totalPages = Math.ceil(filtered.length / rowsPerPage);
   const pagination = document.getElementById("pagination");
   const pageInfo = document.getElementById("pageInfo");
   pagination.style.display = totalPages > 1 ? "flex" : "none";
