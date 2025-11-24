@@ -19,6 +19,10 @@
   .cell-gray { background-color: #e0e0e0; color: #555; }
   .cell-green { background-color: #d4edda; font-weight: bold; color: #155724; }
   .cell-yellow { background-color: #fff3cd; }
+  /* BK列用の新しいクラス */
+  .cell-bk-none { background-color: #fff; color: #000; } /* 問い合わせなし */
+  .cell-bk-inquiry { background-color: #fff3cd; color: #b58900; } /* 問い合わせ中 */
+  .cell-bk-other { background-color: #d4edda; color: #155724; font-weight: bold; } /* それ以外 */
   .pagination { display: flex; justify-content: center; align-items: center; gap: 1em; margin-top: 1em; }
   .pagination button { padding: 0.4em 1em; border: 1px solid #ccc; border-radius: 5px; background: #fff; cursor: pointer; }
   .pagination button:disabled { opacity: 0.5; cursor: default; }
@@ -100,7 +104,6 @@ document.getElementById("searchForm").addEventListener("submit", async e => {
   const month = document.getElementById("targetMonth").value;
   if (!month) return alert("対象年月を選択してください。");
 
-  // 月別JSONのURLを生成（yyyy-m.json形式）
   const fileName = month.replace("年","-").replace("月","") + ".json";
   const JSON_URL = `https://ko-umeda-coder.github.io/check-bc-np/${fileName}`;
 
@@ -127,7 +130,6 @@ function renderPage() {
   const tbody = document.querySelector("#resultTable tbody");
   tbody.innerHTML = "";
 
-  // 検索条件フィルタ
   const orderNoVal = document.getElementById("orderNo").value.trim();
   const weddingDateVal = document.getElementById("weddingDate").value.trim();
   const groomNameVal = document.getElementById("groomName").value.trim();
@@ -147,12 +149,14 @@ function renderPage() {
   pageData.forEach(r => {
     const tr = document.createElement("tr");
 
-    const bkClass = r["BK"] === "対象外"
-      ? "cell-gray"
-      : r["BK"].includes("問い合わせ中")
-        ? "cell-yellow"
-        : "cell-green";
+    // BK列判定（変更）
+    const bkClass = r["BK"] === "問い合わせなし" 
+      ? "cell-bk-none"
+      : r["BK"].includes("問い合わせ中") 
+        ? "cell-bk-inquiry"
+        : "cell-bk-other";
 
+    // NP列は現状維持
     const npClass = r["ネームプレート"].includes("対象外") ? "cell-gray" :
                     r["ネームプレート"].includes("問い合わせ中") ? "cell-yellow" :
                     r["ネームプレート"].includes("手配") ? "cell-green" : "";
