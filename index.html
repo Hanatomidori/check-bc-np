@@ -79,7 +79,7 @@
   </div>
 
 <script>
-const MONTHS_URL = "https://ko-umeda-coder.github.io/check-bc-np/months.json";
+const MONTHS_URL = "https://hanatomidori.github.io/check-bc-np/months.json";
 let allData = [];
 let currentPage = 1;
 const rowsPerPage = 5;
@@ -105,7 +105,7 @@ document.getElementById("searchForm").addEventListener("submit", async e => {
   if (!month) return alert("対象年月を選択してください。");
 
   const fileName = month.replace("年","-").replace("月","") + ".json";
-  const JSON_URL = `https://ko-umeda-coder.github.io/check-bc-np/${fileName}`;
+  const JSON_URL = `https://hanatomidori.github.io/check-bc-np/${fileName}`;
 
   document.getElementById("spinner").style.display = "block";
 
