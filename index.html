@@ -84,48 +84,61 @@ let allData = [];
 let currentPage = 1;
 const rowsPerPage = 5;
 
-// 初期化
+// 初期化：月リストの取得
 document.addEventListener("DOMContentLoaded", async () => {
-  const res = await fetch(MONTHS_URL);
-  const months = await res.json();
-  const select = document.getElementById("targetMonth");
-  select.innerHTML = '<option value="">選択してください</option>';
-  months.forEach(m => {
-    const opt = document.createElement("option");
-    opt.value = m;
-    opt.textContent = m;
-    select.appendChild(opt);
-  });
+  try {
+    const res = await fetch(MONTHS_URL + "?t=" + new Date().getTime()); // キャッシュ対策
+    if (!res.ok) throw new Error("months.json取得失敗");
+    const months = await res.json();
+    const select = document.getElementById("targetMonth");
+    select.innerHTML = '<option value="">選択してください</option>';
+    months.forEach(m => {
+      const opt = document.createElement("option");
+      opt.value = m;
+      opt.textContent = m;
+      select.appendChild(opt);
+    });
+  } catch (err) {
+    console.error(err);
+    alert("初期データの読み込みに失敗しました。");
+  }
 });
 
-// 検索ボタン
+// 検索ボタンクリック時の処理
 document.getElementById("searchForm").addEventListener("submit", async e => {
   e.preventDefault();
   const month = document.getElementById("targetMonth").value;
   if (!month) return alert("対象年月を選択してください。");
 
+  // ファイル名作成（yyyy年m月 → yyyy-m.json）
   const fileName = month.replace("年","-").replace("月","") + ".json";
   const JSON_URL = `https://hanatomidori.github.io/check-bc-np/${fileName}`;
 
   document.getElementById("spinner").style.display = "block";
+  const resultBody = document.querySelector("#resultTable tbody");
+  resultBody.innerHTML = ""; // 検索中はクリア
 
   try {
-    const res = await fetch(JSON_URL);
-    if (!res.ok) throw new Error("JSON取得失敗");
-    const data = await res.json();
-    allData = data;
+    // キャッシュ対策としてタイムスタンプを付与(?t=...)
+    const res = await fetch(JSON_URL + "?t=" + new Date().getTime());
+    if (!res.ok) throw new Error("データファイルが見つかりません");
+    
+    allData = await res.json();
+    
+    // データ取得成功時にページを1に戻して描画
+    currentPage = 1;
+    renderPage();
+    
   } catch(err) {
     alert("データ取得に失敗しました: " + err);
     allData = [];
+    renderPage(); // 空状態で再描画
   } finally {
     document.getElementById("spinner").style.display = "none";
   }
-
-  currentPage = 1;
-  renderPage();
 });
 
-// ページ描画
+// ページ描画関数（フィルタリング含む）
 function renderPage() {
   const tbody = document.querySelector("#resultTable tbody");
   tbody.innerHTML = "";
@@ -135,58 +148,89 @@ function renderPage() {
   const groomNameVal = document.getElementById("groomName").value.trim();
   const brideNameVal = document.getElementById("brideName").value.trim();
 
+  // ★修正ポイント：String(...)で文字に変換してから検索
   let filtered = allData.filter(r => {
-    return (!orderNoVal || r["受注番号"].includes(orderNoVal)) &&
-           (!weddingDateVal || r["挙式日"].includes(weddingDateVal)) &&
-           (!groomNameVal || r["新郎"].includes(groomNameVal)) &&
-           (!brideNameVal || r["新婦"].includes(brideNameVal));
+    const rOrder = r["受注番号"] ? String(r["受注番号"]) : "";
+    const rDate  = r["挙式日"] ? String(r["挙式日"]) : "";
+    const rGroom = r["新郎"] ? String(r["新郎"]) : "";
+    const rBride = r["新婦"] ? String(r["新婦"]) : "";
+
+    return (!orderNoVal || rOrder.includes(orderNoVal)) &&
+           (!weddingDateVal || rDate.includes(weddingDateVal)) &&
+           (!groomNameVal || rGroom.includes(groomNameVal)) &&
+           (!brideNameVal || rBride.includes(brideNameVal));
   });
 
+  if (filtered.length === 0) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td colspan="6" style="padding:2em; color:#666;">該当するデータはありません</td>`;
+    tbody.appendChild(tr);
+    document.getElementById("pagination").style.display = "none";
+    return;
+  }
+
+  // ページネーション計算
   const start = (currentPage - 1) * rowsPerPage;
   const end = Math.min(start + rowsPerPage, filtered.length);
   const pageData = filtered.slice(start, end);
 
+  // 行の生成
   pageData.forEach(r => {
     const tr = document.createElement("tr");
 
-    // BK列判定（変更）
-    const bkClass = r["BK"] === "問い合わせなし" 
+    // BK列判定
+    const bkVal = r["BK"] ? String(r["BK"]) : "";
+    const bkClass = bkVal === "問い合わせなし" 
       ? "cell-bk-none"
-      : r["BK"].includes("問い合わせ中") 
+      : bkVal.includes("問い合わせ中") 
         ? "cell-bk-inquiry"
         : "cell-bk-other";
 
-    // NP列は現状維持
-    const npClass = r["ネームプレート"].includes("対象外") ? "cell-gray" :
-                    r["ネームプレート"].includes("問い合わせ中") ? "cell-yellow" :
-                    r["ネームプレート"].includes("手配") ? "cell-green" : "";
+    // NP列判定
+    const npVal = r["ネームプレート"] ? String(r["ネームプレート"]) : "";
+    const npClass = npVal.includes("対象外") ? "cell-gray" :
+                    npVal.includes("問い合わせ中") ? "cell-yellow" :
+                    npVal.includes("手配") ? "cell-green" : "";
 
     tr.innerHTML = `
-      <td>${r["受注番号"]}</td>
-      <td>${r["挙式日"]}</td>
-      <td>${r["新郎"]}</td>
-      <td>${r["新婦"]}</td>
-      <td class="${bkClass}">${r["BK"]}</td>
-      <td class="${npClass}">${r["ネームプレート"]}</td>
+      <td>${r["受注番号"] || ""}</td>
+      <td>${r["挙式日"] || ""}</td>
+      <td>${r["新郎"] || ""}</td>
+      <td>${r["新婦"] || ""}</td>
+      <td class="${bkClass}">${bkVal}</td>
+      <td class="${npClass}">${npVal}</td>
     `;
     tbody.appendChild(tr);
   });
 
+  // ページネーションボタン制御
   const totalPages = Math.ceil(filtered.length / rowsPerPage);
   const pagination = document.getElementById("pagination");
   const pageInfo = document.getElementById("pageInfo");
+  
   pagination.style.display = totalPages > 1 ? "flex" : "none";
   pageInfo.textContent = `${currentPage} / ${totalPages}`;
+  
+  // 現在のページ状態を保存（ボタンイベントで使うため）
+  window.currentTotalPages = totalPages;
   document.getElementById("prevBtn").disabled = currentPage === 1;
   document.getElementById("nextBtn").disabled = currentPage === totalPages;
 }
 
+// ページネーションボタンのイベント（グローバル）
 document.getElementById("prevBtn").addEventListener("click", () => {
-  if (currentPage > 1) { currentPage--; renderPage(); }
+  if (currentPage > 1) { 
+    currentPage--; 
+    renderPage(); 
+  }
 });
+
 document.getElementById("nextBtn").addEventListener("click", () => {
-  const totalPages = Math.ceil(allData.length / rowsPerPage);
-  if (currentPage < totalPages) { currentPage++; renderPage(); }
+  // renderPageで計算した総ページ数を使用
+  if (currentPage < window.currentTotalPages) { 
+    currentPage++; 
+    renderPage(); 
+  }
 });
 </script>
 </body>
